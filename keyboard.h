@@ -13,13 +13,18 @@
 #define TOUCHMIDI40_H
 
 #include <Arduino.h>
+#include "configuration.h"
+#include "i2cdevice.h"
 
 constexpr uint8_t MAX_NOTE = 12;
+constexpr uint8_t MAX_CHATTERING_TIME = 2;  // *10msec
 
 class TouchKbd {
 
 public:
   TouchKbd(void);
+  void init(int tchSwNum);
+  void periodic(void);
   void mainLoop(void);
   void checkTouch(uint16_t sw[]);
   void checkTouch3dev(uint16_t sw[]);
@@ -27,7 +32,12 @@ public:
 
 private:
   static const uint8_t KEY_SWITCH[MAX_NOTE];
-  bool  crntTouch[MAX_NOTE];
+  bool      _crntTouch[MAX_NOTE];
+  uint8_t   _anti_chattering_counter[MAX_NOTE];
 
+  bool      _touchSwitch[MAX_DEVICE_MBR3110][10];
+  int       _touchSwNum;
+  int       _joystick_x;
+  int       _joystick_y;
 };
 #endif

@@ -26,12 +26,11 @@ void initHardware( void );
   int MBR3110_checkWriteConfig( unsigned char checksumL, unsigned char checksumH, unsigned char crntI2cAdrs );
   int MBR3110_writeConfig( int number, unsigned char crntI2cAdrs );
 
-  #define   MAX_DEVICE_MBR3110    6
-
 
 // USE_ADA88
 	void ada88_init( void );
 	void ada88_write( int letter );
+  void ada88_writeBit( uint16_t num );
 	void ada88_writeNumber( int num );
 
 // USE_AP4

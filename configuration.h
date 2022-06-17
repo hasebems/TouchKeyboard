@@ -14,7 +14,9 @@
 //---------------------------------------------------------
 //    Touch Sensor Setup Mode
 //---------------------------------------------------------
-#define SETUP_MODE    0   //  1: Setup Mode, 0: Normal Mode
+#define   SETUP_MODE    1   //  1: Setup Mode, 0: Normal Mode
+
+#define   MAX_DEVICE_MBR3110    12
 
 //---------------------------------------------------------
 //    Hardware Setting
@@ -37,6 +39,8 @@
 #define LED_ERR       6   //  PD7
 #define LED1          A5   // PF0
 #define LED2          A4   // PF1
+#define JOYSTICK_X    A5   // PF0
+#define JOYSTICK_Y    A4   // PF1
 
 //  Not Use
 #define   MAX_LED       12

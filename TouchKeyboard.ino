@@ -34,7 +34,7 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 
 /*----------------------------------------------------------------------------*/
 int maxCapSenseDevice;
-bool availableEachDevice[6];
+bool availableEachDevice[MAX_DEVICE_MBR3110];
 
 GlobalTimer gt;
 static TouchKbd tchkbd;
@@ -79,27 +79,27 @@ void setup()
 
   pinMode(LED_ERR, OUTPUT);
   digitalWrite(LED_ERR, HIGH);
-  pinMode(LED1, OUTPUT);
-  digitalWrite(LED1, HIGH);
-  pinMode(LED2, OUTPUT);
-  digitalWrite(LED2, HIGH);
+  //pinMode(LED1, OUTPUT);
+  //digitalWrite(LED1, HIGH);
+  //pinMode(LED2, OUTPUT);
+  //digitalWrite(LED2, HIGH);
 
   for (i=0; i<MAX_DEVICE_MBR3110; ++i){
     availableEachDevice[i] = true;
   }
-  maxCapSenseDevice = 6;
+  maxCapSenseDevice = MAX_DEVICE_MBR3110;
 
-  int errNum = 0;
+  uint16_t errNum = 0;
 #if SETUP_MODE // CapSense Setup Mode
   for (i=0; i<maxCapSenseDevice; ++i){
     err = MBR3110_setup(i);
     if (err){
       availableEachDevice[i] = false;
       digitalWrite(LED_ERR, HIGH);
-      errNum += 0x01<<i;
+      errNum += 0x0001<<i;
     }
   }
-  setAda88_Number(errNum*10);
+  setAda88_Bit(errNum);
   delay(2000);          // if something wrong, 2sec LED_ERR on
   for (i=0; i<3; i++){  // when finished, flash 3times.
     digitalWrite(LED_ERR, LOW);
@@ -117,15 +117,15 @@ void setup()
     if (availableEachDevice[i]){
       err = MBR3110_init(i);
       if (err){
-        availableEachDevice[i] = false;       
-        errNum += 0x01<<i;
+        availableEachDevice[i] = false;
+        errNum += 0x0001<<i;
       }
     }
   }
   if (errNum){
     //  if err, stop 5sec.
     digitalWrite(LED_ERR, HIGH);
-    setAda88_Number(errNum*10);
+    setAda88_Bit(errNum);
     delay(5000);  //  5sec LED_ERR on
     digitalWrite(LED_ERR, LOW);
     ada88_write(0);
@@ -134,6 +134,8 @@ void setup()
   //  Set NeoPixel Library 
   led.begin();
   led.show(); // Initialize all pixels to 'off'
+
+  tchkbd.init(maxCapSenseDevice);
 
   //  Set Interrupt
   MsTimer2::set(10, flash);     // 10ms Interval Timer Interrupt
@@ -168,6 +170,7 @@ void loop()
           errNum += 0x01<<i;
         }
         sw[i] = (((uint16_t)swtmp[1])<<8) + swtmp[0];
+        setAda88_Number(sw[i]*10);
       }
     }
     if (errNum){
@@ -176,10 +179,12 @@ void loop()
     }
     else {
       digitalWrite(LED_ERR, LOW);
+      tchkbd.checkTouch(sw);
     }
  #endif
     //  Processing
     //  do something
+    tchkbd.periodic();
   }
 }
 /*----------------------------------------------------------------------------*/
@@ -278,6 +283,12 @@ void setAda88_Number( int number )
 {
 #ifdef USE_ADA88
   ada88_writeNumber(number);  // -1999 - 1999
+#endif
+}
+void setAda88_Bit( uint16_t bit )
+{
+#ifdef USE_ADA88
+  ada88_writeBit(bit);  // 0x0000 - 0xffff
 #endif
 }
 /*----------------------------------------------------------------------------*/
