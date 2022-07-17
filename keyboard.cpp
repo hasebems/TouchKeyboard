@@ -77,25 +77,54 @@ void TouchKbd::mainLoop(void)
   }
 }
 /*----------------------------------------------------------------------------*/
+//      |01|09|00|03|  |
+//    02|--+--+--+--|04|  player
+//      |08|07|06|05|  |
+//
+//  Depth Pattern  : [4][345][0356][0679][1789][128][2] -> no touch=0,[4]=1...[2]=127
+//  Vibrato Pattern: [012349][245678] -> no touch=0,[012349]=1...[245678]=127
+//  Switch Pattern : [2][19][03][78][56][4] -> no touch=0,16,32,48,64,80,96
+/*----------------------------------------------------------------------------*/
+void TouchKbd::detect_midi_message(int sw, int locate, bool onoff)
+{
+  int i;
+  _touchSwitch[sw][locate] = onoff;
+
+  //=== Depth Pattern ===
+  bool depth[6]={false,false,false,false,false,false};
+  const int dpt_index[MAX_ELECTRODE] = {2,4,5,1,0,1,2,3,4,3};
+  for (i=0; i<MAX_ELECTRODE; i++){
+    if (_touchSwitch[sw][i]){depth[dpt_index[i]]=true;}
+  }
+  int start=-1;
+  int end=-1;
+  for(i=5; i>=0; --i){
+    if (start==-1){
+      if (depth[i]){start=end=i;}
+    }
+    else{
+      if (depth[i]){end=i;}
+    }
+  }
+  int midi_value = (start+end+2)*10;// 0-120
+  if (midi_value>=120){midi_value=127;}
+  setMidiPolyPressure(60+sw,midi_value);
+}
+/*----------------------------------------------------------------------------*/
 void TouchKbd::checkTouch(uint16_t sw[])
 {
   for (int i=0; i<_touchSwNum; ++i){
     uint16_t raw_data = sw[i];
     for (int j=0; j<10; j++){
       if ((raw_data & 0x0001) && !_touchSwitch[i][j]){
-        setMidiPolyPressure(60+i,j);
-        _touchSwitch[i][j] = true;
+        detect_midi_message(i,j,true);
       }
       else if (!(raw_data & 0x0001) && _touchSwitch[i][j]){
-        _touchSwitch[i][j] = false;
+        detect_midi_message(i,j,false);
       }
       raw_data = raw_data>>1;
     }
   }
-}
-/*----------------------------------------------------------------------------*/
-void TouchKbd::checkTouch3dev(uint16_t sw[])
-{
 }
 /*----------------------------------------------------------------------------*/
 void TouchKbd::makeNoteEvent(int notenum, bool onoff, int vel=127)
