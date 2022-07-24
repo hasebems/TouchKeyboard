@@ -32,6 +32,7 @@ void initHardware( void );
 	void ada88_write( int letter );
   void ada88_writeBit( uint16_t num );
 	void ada88_writeNumber( int num );
+  void ada88_write_5param(uint8_t prm1, uint8_t prm2, uint8_t prm3, uint8_t prm4, uint8_t prm5);
 
 // USE_AP4
   int ap4_getAirPressure( void );
@@ -53,6 +54,10 @@ void initHardware( void );
 
 // USE_PCA9544A
 	int pca9544_changeI2cBus( int i2c );
+
+// USE_PCAL9555A
+  int pcal9555a_init(void);
+  int pcal9555a_get_value(int port, uint8_t* value);
 
 int write_i2cDevice( unsigned char adrs, unsigned char* buf, int count );
 int read1byte_i2cDevice( unsigned char adrs, unsigned char* wrBuf, unsigned char* rdBuf, int wrCount );

@@ -86,7 +86,7 @@ int read_nbyte_i2cDevice( unsigned char adrs, unsigned char* wrBuf, unsigned cha
 
 	err = Wire.requestFrom(adrs,static_cast<uint8_t>(rdCount),(uint8_t)0);
 	int rdAv = 0;
-	while( rdAv = Wire.available() ) {
+	while((rdAv = Wire.available()) != 0) {
 		*(rdBuf+rdCount-rdAv) = Wire.read();
 	}
 
@@ -435,7 +435,7 @@ void MBR3110_resetAll(int maxdevNum)
 {
   unsigned char i2cdata[2] = {CTRL_CMD, POWER_ON_AND_FINISHED};
 
-  if (maxdevNum >= MAX_DEVICE_MBR3110){ return -1;}
+  if (maxdevNum >= MAX_DEVICE_MBR3110){ return;}
 
   delay(15);
   for (int i=0; i<maxdevNum; i++){
@@ -454,7 +454,6 @@ void MBR3110_reset(unsigned char i2cAdrs)
 //-------------------------------------------------------------------------
 int MBR3110_init( int number )
 {
- 	unsigned char i2cdata[2];
 	unsigned char selfCheckResult;
 
   if (number >= MAX_DEVICE_MBR3110){ return -1;}
@@ -483,7 +482,6 @@ int MBR3110_init( int number )
 int MBR3110_setup( int number )
 {
   unsigned char i2cAdrs = tI2cAdrs[number];
-  unsigned char i2cdata[2];
   int err;
 
   if (number >= MAX_DEVICE_MBR3110){ return -1;}
@@ -607,7 +605,6 @@ int MBR3110_writeConfig( int number, unsigned char crntI2cAdrs )
   int err;
 	unsigned char	data[CONFIG_DATA_SZ+1];
   const unsigned char* configData = tCY8CMBR3110_ConfigData[number];
-  unsigned char i2cdata[2];
 
   //*** Prepare ***
   MBR3110_reset(crntI2cAdrs);
@@ -752,7 +749,7 @@ void ada88_writeBit( uint16_t num )	//	num 0x0000 - 0xffff
 //  oooooooo : No Light
 //  oooooooo : No Light
 //  oooooooo : No Light
-//  xxxxxxxx : Upper 8bit Display
+//  xxxxxxxx : Upper 8bit Display 
 //  xxxxxxxx : Lower 8bit Display
 //
 	unsigned char i2cBufx[17];
@@ -779,23 +776,24 @@ void ada88_writeBit( uint16_t num )	//	num 0x0000 - 0xffff
 	write_i2cDevice( ADA88_I2C_ADRS, i2cBufx, 17 );
 }
 //---------------------------------------------------------
+static const unsigned char numletter[10][5] PROGMEM = {//3*5
+  { 0x07, 0x05, 0x05, 0x05, 0x07 }, // 0
+  { 0x04, 0x04, 0x04, 0x04, 0x04 }, // 1
+  { 0x07, 0x04, 0x07, 0x01, 0x07 }, // 2
+  { 0x07, 0x04, 0x07, 0x04, 0x07 }, // 3
+  { 0x05, 0x05, 0x07, 0x04, 0x04 }, // 4
+  { 0x07, 0x01, 0x07, 0x04, 0x07 }, // 5
+  { 0x07, 0x01, 0x07, 0x05, 0x07 }, // 6
+  { 0x07, 0x04, 0x04, 0x04, 0x04 }, // 7
+  { 0x07, 0x05, 0x07, 0x05, 0x07 }, // 8
+  { 0x07, 0x05, 0x07, 0x04, 0x07 }  // 9
+};
 void ada88_writeNumber( int num )	//	num 1999 .. -1999
 {
 	int i;
 	unsigned char i2cBufx[17];
 	unsigned char ledPtn[8] = {0};
-	static const unsigned char numletter[10][5] PROGMEM = {
-		{ 0x07, 0x05, 0x05, 0x05, 0x07 },
-		{ 0x04, 0x04, 0x04, 0x04, 0x04 },
-		{ 0x07, 0x04, 0x07, 0x01, 0x07 },
-		{ 0x07, 0x04, 0x07, 0x04, 0x07 },
-		{ 0x05, 0x05, 0x07, 0x04, 0x04 },
-		{ 0x07, 0x01, 0x07, 0x04, 0x07 },
-		{ 0x07, 0x01, 0x07, 0x05, 0x07 },
-		{ 0x07, 0x04, 0x04, 0x04, 0x04 },
-		{ 0x07, 0x05, 0x07, 0x05, 0x07 },
-		{ 0x07, 0x05, 0x07, 0x04, 0x07 }
-	};
+
 	static const unsigned char graph[10][2] PROGMEM = {
 		{ 0x00, 0x00 },
 		{ 0x00, 0x40 },
@@ -841,6 +839,46 @@ void ada88_writeNumber( int num )	//	num 1999 .. -1999
 		i2cBufx[i*2+2] = 0;
 	}
 	write_i2cDevice( ADA88_I2C_ADRS, i2cBufx, 17 );
+}
+//---------------------------------------------------------
+void ada88_write_5param(uint8_t prm1, uint8_t prm2, uint8_t prm3, uint8_t prm4, uint8_t prm5)
+//  prm1:0-9, prm2:0-7, prm3:0-7, prm4:0-7, prm0-7
+{
+  int i;
+  unsigned char i2cBufx[17];
+  unsigned char ledPtn[8] = {0};
+
+  if (prm1>9){prm1=9;}
+  if (prm2>7){prm2=7;}
+  if (prm3>7){prm3=7;}
+  if (prm4>7){prm4=7;}
+  if (prm5>7){prm5=7;}
+
+  for (i=0; i<5; i++){
+    ledPtn[i+1] |= (pgm_read_byte(&(numletter[prm1][i]))<<1);
+  }
+
+  for (i=0; i<prm2; i++){ //  horizontal
+    ledPtn[7] |= (0x01<<i);
+  }
+  ledPtn[7] |= 0x80;      //  always ON
+  for (i=0; i<prm3; i++){ //  vertical L
+    ledPtn[6-i] |= 0x80; 
+  }
+
+  for (i=0; i<prm4; i++){ //  vertical R1
+    ledPtn[6-i] |= 0x20;
+  }
+  for (i=0; i<prm5; i++){ //  vertical R2
+    ledPtn[6-i] |= 0x40;
+  }
+
+  i2cBufx[0] = 0;
+  for ( i=0; i<8; i++ ){
+    i2cBufx[i*2+1] = ledPtn[i];
+    i2cBufx[i*2+2] = 0;
+  }
+  write_i2cDevice( ADA88_I2C_ADRS, i2cBufx, 17 );
 }
 #endif
 
@@ -1077,7 +1115,7 @@ int PCA9685_setFullColorLED( int chipNumber, int ledNum, unsigned short* color  
 		err = PCA9685_write( chipNumber, (uint8)(0x09 + i*4 + ledNum*16), 0 );
         if ( err != 0 ){ return err; }
 	}
-    return err;
+  return err;
 }
 #endif
 
@@ -1113,6 +1151,48 @@ int pca9544_changeI2cBus( int i2c )
 	int		err = 0;
 	err = write_i2cDevice( PCA9544A_I2C_ADRS, &i2cBuf, 1 );
 	return err;
+}
+#endif
+
+
+#ifdef USE_PCAL9555A
+//---------------------------------------------------------
+//    << PCAL9555A >>
+//---------------------------------------------------------
+static const unsigned char PCAL9555A_I2C_ADRS = 0x27; //  A0=A1=A2=high
+static const unsigned char PCAL9555A_CMD_READ_PORT0 = 0x00;
+static const unsigned char PCAL9555A_CMD_READ_PORT1 = 0x01;
+static const unsigned char PCAL9555A_CMD_SET_PORT0_DIR = 0x06;
+static const unsigned char PCAL9555A_CMD_SET_PORT1_DIR = 0x07;
+static const unsigned char PCAL9555A_CMD_ENBL_PORT0_PUPDWN = 0x46;
+static const unsigned char PCAL9555A_CMD_SEL_PORT0_PUPDWN = 0x48;
+static const unsigned char PCAL9555A_CMD_ENBL_PORT1_PUPDWN = 0x47;
+static const unsigned char PCAL9555A_CMD_SEL_PORT1_PUPDWN = 0x49;
+//-------------------------------------------------------------------------
+//      PCAL9555A ( I2C GPIO Expander )
+//-------------------------------------------------------------------------
+int pcal9555a_init(void)
+{
+  uint8_t i2cBuf[3];
+  int   err = 0;
+  i2cBuf[0] = PCAL9555A_CMD_SET_PORT0_DIR;
+  i2cBuf[1] = 0xff; i2cBuf[2] = 0xff;   // All pin are input.
+  err = write_i2cDevice(PCAL9555A_I2C_ADRS, i2cBuf, 3);
+//  if (err){return err;}
+
+//  uint8_t pupdwn[4];
+//  pupdwn[0] = PCAL9555A_CMD_ENBL_PORT0_PUPDWN;
+//  pupdwn[1] = 0x00; pupdwn[2] = 0x00; pupdwn[3] = 0x00; pupdwn[4] = 0x00; // NO internal pull up
+//  err = write_i2cDevice(PCAL9555A_I2C_ADRS, pupdwn, 5);
+  return err;
+}
+//-------------------------------------------------------------------------
+int pcal9555a_get_value(int port, uint8_t* value)
+{
+  uint8_t i2cCmd = (port==0)? PCAL9555A_CMD_READ_PORT0:PCAL9555A_CMD_READ_PORT1;
+  int   err = 0;
+  err = read1byte_i2cDevice(PCAL9555A_I2C_ADRS, &i2cCmd, value, 1);
+  return err;
 }
 #endif
 /* [] END OF FILE */
