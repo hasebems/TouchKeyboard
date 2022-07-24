@@ -48,6 +48,30 @@ void TouchKbd::incCntrlrMode(void)
   }
 }
 /*----------------------------------------------------------------------------*/
+void TouchKbd::check_ui_sw(void)
+{
+#ifdef USE_PCAL9555A
+  uint8_t val = 0;
+  int err = pcal9555a_get_value(1,&val);
+  if (err!=0){return;}
+
+  for (int j=0; j<3; j++){
+    if ((~val)&(0x80>>j)){
+      if (!_uiSw[j]){
+        _uiSw[j]=true;
+        // on event
+        if (j==0){ changeControllerMode(MD_DEPTH_POLY);}
+        if (j==1){ changeControllerMode(MD_TOUCH_MONO);}
+        if (j==2){ changeControllerMode(MD_SWITCH);}
+      }
+    }
+    else {
+      _uiSw[j]=false;
+    }
+  }
+#endif
+}
+/*----------------------------------------------------------------------------*/
 void TouchKbd::periodic(void) // once 10msec
 {
   for (int i=0; i<MAX_NOTE; ++i){
@@ -70,26 +94,10 @@ void TouchKbd::periodic(void) // once 10msec
       setMidiPitchBend(static_cast<uint8_t>(y/8));
     }
   }
+  check_ui_sw();
 
-#ifdef USE_PCAL9555A
-  uint8_t val = 0;
-  int err = pcal9555a_get_value(1,&val);
-  if (err==0){
-    for (int j=0; j<3; j++){
-      if ((~val)&(0x80>>j)){
-        if (!_uiSw[j]){
-          _uiSw[j]=true;
-          // on event
-          if (j==1){ incCntrlrMode();}
-        }
-      }
-      else {
-        _uiSw[j]=false;
-      }
-    }
-  }
+  //  display Ada88
   setAda88_5prm(_cntrlrMode, 2, 3, 4, 5);
-#endif
 }
 /*----------------------------------------------------------------------------*/
 void TouchKbd::mainLoop(void)
@@ -251,7 +259,7 @@ void TouchKbd::select_pattern(int key)
 /*----------------------------------------------------------------------------*/
 void TouchKbd::checkTouchEach(uint8_t key, uint16_t raw_data)
 {
-  for (int j=0; j<10; j++){
+  for (int j=0; j<MAX_ELECTRODE; j++){
     if ((raw_data & 0x0001) && !_touchSwitch[key][j]){
       _touchSwitch[key][j] = true;
       select_pattern(key);

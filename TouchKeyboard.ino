@@ -64,13 +64,11 @@ void setup()
   ada88_write(0);
 #endif
 
-  //  Init Touch Keyboard
-  tchkbd.init(maxCapSenseDevice);
-  err = 1;
+  bool sub_board = false;
 #ifdef USE_PCAL9555A
   err = pcal9555a_init();
+  if (err!=0){sub_board=true;}
 #endif
-  if (err==0){tchkbd.changeControllerMode(MD_DEPTH_POLY);}
 
   //  Read Jumper Pin Setting
   pinMode(KBD_C, INPUT); 
@@ -138,6 +136,17 @@ void setup()
     delay(5000);  //  5sec LED_ERR on
     digitalWrite(LED_ERR, LOW);
     ada88_write(0);
+  }
+
+  //  Init Touch Keyboard
+  if (!sub_board){
+    //  Main Board
+    tchkbd.init(maxCapSenseDevice*2);
+    tchkbd.changeControllerMode(MD_DEPTH_POLY);
+  }
+  else {
+    //  Sub Board
+    tchkbd.init(maxCapSenseDevice);
   }
 
   //  Set NeoPixel Library 
@@ -300,7 +309,7 @@ void handlerPAT( byte channel , byte note , byte pressure )
     uint8_t key = note & 0x0f;
 
     uint16_t newTouch = (noteBitPtn<<3) | prsBitPtn;
-    tchkbd.checkTouchEach(key, newTouch);
+    tchkbd.checkTouchEach(key+12, newTouch);  //  1octave above
   }
 }
 /*----------------------------------------------------------------------------*/

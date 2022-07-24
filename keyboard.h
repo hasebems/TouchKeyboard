@@ -35,6 +35,7 @@ public:
   TouchKbd(void);
   void init(int tchSwNum);
   void incCntrlrMode(void);
+  void check_ui_sw(void);
   void periodic(void);
   void mainLoop(void);
   void checkTouchEach(uint8_t key, uint16_t sw);
@@ -55,7 +56,7 @@ private:
   bool      _crntTouch[MAX_NOTE];
   uint8_t   _anti_chattering_counter[MAX_NOTE];
 
-  bool      _touchSwitch[MAX_DEVICE_MBR3110][MAX_ELECTRODE];
+  bool      _touchSwitch[MAX_DEVICE_MBR3110*2][MAX_ELECTRODE];
   int       _touchSwNum;
   int       _joystick_x;
   int       _joystick_y;
