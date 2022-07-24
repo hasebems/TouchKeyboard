@@ -74,16 +74,18 @@ void TouchKbd::periodic(void) // once 10msec
 #ifdef USE_PCAL9555A
   uint8_t val = 0;
   int err = pcal9555a_get_value(1,&val);
-  for (int j=0; j<3; j++){
-    if ((~val)&(0x80>>j)){
-      if (!_uiSw[j]){
-        _uiSw[j]=true;
-        // on event
-        if (j==1){ incCntrlrMode();}
+  if (err==0){
+    for (int j=0; j<3; j++){
+      if ((~val)&(0x80>>j)){
+        if (!_uiSw[j]){
+          _uiSw[j]=true;
+          // on event
+          if (j==1){ incCntrlrMode();}
+        }
       }
-    }
-    else {
-      _uiSw[j]=false;
+      else {
+        _uiSw[j]=false;
+      }
     }
   }
   setAda88_5prm(_cntrlrMode, 2, 3, 4, 5);
@@ -98,7 +100,7 @@ void TouchKbd::mainLoop(void)
       if (sw == HIGH){
         digitalWrite(LED_ERR, LOW);
         if (_crntTouch[i] == true){
-          makeNoteEvent(60+i,false);
+          makeNoteEvent(i,false);
           _crntTouch[i] = false;
           _anti_chattering_counter[i] = 0;
         }
@@ -106,7 +108,7 @@ void TouchKbd::mainLoop(void)
       else {
         digitalWrite(LED_ERR, HIGH);
         if (_crntTouch[i] == false){
-          makeNoteEvent(60+i,true);
+          makeNoteEvent(i,true);
           _crntTouch[i] = true;
           _anti_chattering_counter[i] = 0;
         }
@@ -161,7 +163,7 @@ void TouchKbd::depth_pattern(int key)
   int midi_value = (start+end+2)*10;// 0-120
   if (midi_value>=120){midi_value=127;}
   if (_crntDpt[key]!=midi_value){
-    setMidiPAT(60+key,midi_value);
+    setMidiPAT(MAIN_BOARD_OFFSET_NOTE+key,midi_value);
     _crntDpt[key] = midi_value;
   }
 }
@@ -179,7 +181,7 @@ void TouchKbd::vibrato_pattern(int key)
   if (bitPtn==0x01){vib=1;}
   else if (bitPtn==0x02){vib=2;}
   if (vib!=_crntVib[key]){
-    setMidiPAT(60+key,vib);
+    setMidiPAT(MAIN_BOARD_OFFSET_NOTE+key,vib);
     _crntVib[key] = vib;
   }
 }
@@ -218,20 +220,47 @@ void TouchKbd::switch_pattern(int key)
     case 0x20: sw=127; break;
   }
   if (sw!=_crntSw[key]){
-    setMidiPAT(60+key,sw);
+    setMidiPAT(MAIN_BOARD_OFFSET_NOTE+key,sw);
     _crntSw[key] = sw;
   }
 }
+/*----------------------------------------------------------------------------*/
+void TouchKbd::send_to_master(int key)  //  only sub board
+{
+  uint8_t valueBitPtn = 0, noteBitPtn = 0;
+  for(int i=0; i<7; i++){
+    if (_touchSwitch[key][i]){valueBitPtn |= (0x01<<i);}
+  }
 
+  for(int j=0; j<3; j++){
+    if (_touchSwitch[key][j+7]){noteBitPtn |= (0x10<<j);}
+  }
+  setMidiPAT(key+noteBitPtn, valueBitPtn);
+}
 /*----------------------------------------------------------------------------*/
 void TouchKbd::select_pattern(int key)
 {
   switch(_cntrlrMode){
     default: // through
-    case MD_PLAIN:      break;
+    case MD_PLAIN:      send_to_master(key); break;
     case MD_DEPTH_POLY: depth_pattern(key); break;
     case MD_TOUCH_MONO: vibrato_pattern(key); break;
     case MD_SWITCH:     switch_pattern(key); break;
+  }
+}
+/*----------------------------------------------------------------------------*/
+void TouchKbd::checkTouchEach(uint8_t key, uint16_t raw_data)
+{
+  for (int j=0; j<10; j++){
+    if ((raw_data & 0x0001) && !_touchSwitch[key][j]){
+      _touchSwitch[key][j] = true;
+      select_pattern(key);
+    }
+    else if (!(raw_data & 0x0001) && _touchSwitch[key][j]){
+      _touchSwitch[key][j] = false;
+      select_pattern(key);
+    }
+    raw_data = raw_data>>1;
   }
 }
 /*----------------------------------------------------------------------------*/
@@ -239,28 +268,23 @@ void TouchKbd::checkTouch(uint16_t sw[])
 {
   for (int i=0; i<_touchSwNum; ++i){
     uint16_t raw_data = sw[i];
-    for (int j=0; j<10; j++){
-      if ((raw_data & 0x0001) && !_touchSwitch[i][j]){
-        _touchSwitch[i][j] = true;
-        select_pattern(i);
-      }
-      else if (!(raw_data & 0x0001) && _touchSwitch[i][j]){
-        _touchSwitch[i][j] = false;
-        select_pattern(i);
-      }
-      raw_data = raw_data>>1;
-    }
+    checkTouchEach(i,raw_data);
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::makeNoteEvent(int notenum, bool onoff, int vel=127)
+void TouchKbd::makeNoteEvent(int notenum, bool onoff, int vel)
 {
+  uint8_t ofs_note = MAIN_BOARD_OFFSET_NOTE;
+  if (getControllerMode()==MD_PLAIN){
+    ofs_note = SUB_BOARD_OFFSET_NOTE;
+  }
+
   if (onoff){
     // Note On
-    setMidiNoteOn(notenum,vel);
+    setMidiNoteOn(ofs_note + notenum, vel);
   }
   else {
     //  Note Off
-    setMidiNoteOff(notenum,0);
+    setMidiNoteOff(ofs_note + notenum, 0);
   }
 }

@@ -19,6 +19,8 @@
 constexpr uint8_t MAX_NOTE = 12;
 constexpr uint8_t MAX_CHATTERING_TIME = 3;  // *10msec
 constexpr uint8_t MAX_ELECTRODE = 10;
+constexpr uint8_t MAIN_BOARD_OFFSET_NOTE = 60;
+constexpr uint8_t SUB_BOARD_OFFSET_NOTE = 72;
 
 enum CONTROLLER_MODE {
   MD_PLAIN = 0,       //  Sub Board
@@ -35,8 +37,8 @@ public:
   void incCntrlrMode(void);
   void periodic(void);
   void mainLoop(void);
+  void checkTouchEach(uint8_t key, uint16_t sw);
   void checkTouch(uint16_t sw[]);
-  void checkTouch3dev(uint16_t sw[]);
   void makeNoteEvent(int tchNum, bool onoff, int vel=127);
 
   void changeControllerMode(CONTROLLER_MODE mode);
@@ -46,6 +48,7 @@ private:
   void depth_pattern(int sw);
   void vibrato_pattern(int sw);
   void switch_pattern(int key);
+  void send_to_master(int key);
   void select_pattern(int sw);
   
   static const uint8_t KEY_SWITCH[MAX_NOTE];

@@ -16,10 +16,6 @@
 
 // 前方参照
 void receiveMidi( void );
-void handlerNoteOn( byte channel , byte number , byte value );
-void handlerNoteOff( byte channel , byte number , byte value );
-void handlerCC( byte channel , byte number , byte value );
-void midiClock( uint8_t msg );
 void generateTimer( void );
 
 int analogDataRead( void );
@@ -33,8 +29,6 @@ void setMidiProgramChange( uint8_t number );
 void setMidiControlChange( uint8_t controller, uint8_t value );
 void setMidiPAT( uint8_t note, uint8_t value );
 void setMidiPitchBend(int bend);
-
-void midiClock( uint8_t msg );
 
 //  for NeoPixel
 uint8_t colorTbl( uint8_t index, uint8_t rgb );

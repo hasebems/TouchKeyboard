@@ -275,13 +275,13 @@ void receiveMidi( void ){
 /*----------------------------------------------------------------------------*/
 void handlerNoteOn( byte channel , byte number , byte value ){
   if (channel == 0){
-    setMidiNoteOn(number+12, value);
+    setMidiNoteOn(number, value);
   }
 }
 /*----------------------------------------------------------------------------*/
 void handlerNoteOff( byte channel , byte number , byte value ){
   if (channel == 0){
-    setMidiNoteOff(number+12, value);
+    setMidiNoteOff(number, value);
   }
 }
 /*----------------------------------------------------------------------------*/
@@ -294,17 +294,22 @@ void handlerCC( byte channel , byte number , byte value )
 /*----------------------------------------------------------------------------*/
 void handlerPAT( byte channel , byte note , byte pressure )
 {
-  if (channel == 0){
-    setMidiPAT(note+12, pressure);
+  if (channel == 0){  //  for main board
+    uint16_t noteBitPtn = note & 0x0070;
+    uint16_t prsBitPtn = pressure & 0x007f;
+    uint8_t key = note & 0x0f;
+
+    uint16_t newTouch = (noteBitPtn<<3) | prsBitPtn;
+    tchkbd.checkTouchEach(key, newTouch);
   }
 }
 /*----------------------------------------------------------------------------*/
-void midiClock( uint8_t msg )
-{
+//void midiClock( uint8_t msg )
+//{
 //  if ( isMasterBoard == false ){
 //    MIDI.sendControlChange( midi::GeneralPurposeController1, msg, 1 );
 //  }
-}
+//}
 /*----------------------------------------------------------------------------*/
 //
 //     Hardware Access Functions
