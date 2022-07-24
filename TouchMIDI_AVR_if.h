@@ -24,12 +24,15 @@ void generateTimer( void );
 
 int analogDataRead( void );
 void setAda88_Number( int );
+void setAda88_Bit( uint16_t bit );
+void setAda88_5prm(uint8_t prm1,uint8_t prm2,uint8_t prm3,uint8_t prm4,uint8_t prm5);
 void setMidiBuffer( uint8_t status, uint8_t message, uint8_t value );
 void setMidiNoteOn( uint8_t note, uint8_t vel );
 void setMidiNoteOff( uint8_t note, uint8_t vel );
 void setMidiProgramChange( uint8_t number );
 void setMidiControlChange( uint8_t controller, uint8_t value );
-void setMidiPolyPressure( uint8_t note, uint8_t value );
+void setMidiPAT( uint8_t note, uint8_t value );
+void setMidiPitchBend(int bend);
 
 void midiClock( uint8_t msg );
 
@@ -41,9 +44,10 @@ void lightLed( void );
 class GlobalTimer {
 
 public:
-  GlobalTimer( void ) : _globalTime(0), _timer100msec(0), _timer100msec_sabun(0),
-                        _timer1sec(0), _timer1sec_sabun(0), _timer10msec_event(false),
-                        _timer100msec_event(false), _timer1sec_event(false) {}
+  GlobalTimer( void ) : _timer10msec_event(false),
+                        _timer100msec_event(false), _timer1sec_event(false),
+                        _globalTime(0), _timer100msec(0), _timer100msec_sabun(0),
+                        _timer1sec(0), _timer1sec_sabun(0) {}
 
   void      incGlobalTime( void ){ _globalTime++;}
   uint32_t  readGlobalTimeAndClear( void )

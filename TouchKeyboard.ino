@@ -52,9 +52,10 @@ void setup()
 
   //  Initialize Hardware
   wireBegin();
-  MIDI.setHandleNoteOff( handlerNoteOff );
-  MIDI.setHandleNoteOn( handlerNoteOn );
-  MIDI.setHandleControlChange( handlerCC );
+  MIDI.setHandleNoteOff(handlerNoteOff);
+  MIDI.setHandleNoteOn(handlerNoteOn);
+  MIDI.setHandleControlChange(handlerCC);
+  MIDI.setHandleAfterTouchPoly(handlerPAT);
   MIDI.begin();
   MIDI.turnThruOff();
 
@@ -62,6 +63,14 @@ void setup()
   ada88_init();
   ada88_write(0);
 #endif
+
+  //  Init Touch Keyboard
+  tchkbd.init(maxCapSenseDevice);
+  err = 1;
+#ifdef USE_PCAL9555A
+  err = pcal9555a_init();
+#endif
+  if (err==0){tchkbd.changeControllerMode(MD_DEPTH_POLY);}
 
   //  Read Jumper Pin Setting
   pinMode(KBD_C, INPUT); 
@@ -135,8 +144,6 @@ void setup()
   led.begin();
   led.show(); // Initialize all pixels to 'off'
 
-  tchkbd.init(maxCapSenseDevice);
-
   //  Set Interrupt
   MsTimer2::set(10, flash);     // 10ms Interval Timer Interrupt
   MsTimer2::start();
@@ -170,7 +177,7 @@ void loop()
           errNum += 0x01<<i;
         }
         sw[i] = (((uint16_t)swtmp[1])<<8) + swtmp[0];
-        setAda88_Number(sw[i]*10);
+        //setAda88_Number(sw[i]*10);
       }
     }
     if (errNum){
@@ -242,10 +249,19 @@ void setMidiControlChange( uint8_t controller, uint8_t value )
   MidiUSB.flush();
 }
 /*----------------------------------------------------------------------------*/
-void setMidiPolyPressure( uint8_t note, uint8_t value )
+void setMidiPAT( uint8_t note, uint8_t value )
 {
   MIDI.sendPolyPressure( note, value, 0 );
   midiEventPacket_t event = {0x0a, 0xa0, note, value};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+/*----------------------------------------------------------------------------*/
+void setMidiPitchBend(int bend)
+{
+  MIDI.sendPitchBend(bend, 0);
+  bend += 0x4000;
+  midiEventPacket_t event = {0x0e, 0xe0, static_cast<uint8_t>(bend & 0x007f), static_cast<uint8_t>((bend & 0x3f80)>>7)};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
 }
@@ -258,14 +274,29 @@ void receiveMidi( void ){
 }
 /*----------------------------------------------------------------------------*/
 void handlerNoteOn( byte channel , byte number , byte value ){
+  if (channel == 0){
+    setMidiNoteOn(number+12, value);
+  }
 }
 /*----------------------------------------------------------------------------*/
 void handlerNoteOff( byte channel , byte number , byte value ){
+  if (channel == 0){
+    setMidiNoteOff(number+12, value);
+  }
 }
 /*----------------------------------------------------------------------------*/
 void handlerCC( byte channel , byte number , byte value )
 {
-
+  if (channel == 0){
+    setMidiControlChange(number, value);
+  }
+}
+/*----------------------------------------------------------------------------*/
+void handlerPAT( byte channel , byte note , byte pressure )
+{
+  if (channel == 0){
+    setMidiPAT(note+12, pressure);
+  }
 }
 /*----------------------------------------------------------------------------*/
 void midiClock( uint8_t msg )
@@ -289,6 +320,13 @@ void setAda88_Bit( uint16_t bit )
 {
 #ifdef USE_ADA88
   ada88_writeBit(bit);  // 0x0000 - 0xffff
+#endif
+}
+void setAda88_5prm(uint8_t prm1,uint8_t prm2,uint8_t prm3,uint8_t prm4,uint8_t prm5)
+//  prm1:0-9, prm2-5:0-7
+{
+#ifdef USE_ADA88
+  ada88_write_5param(prm1,prm2,prm3,prm4,prm5);
 #endif
 }
 /*----------------------------------------------------------------------------*/
