@@ -193,7 +193,7 @@ void loop()
     }
     else {
       digitalWrite(LED_ERR, LOW);
-      tchkbd.checkTouch(sw);
+      tchkbd.check_touch(sw);
     }
  #endif
     //  Processing
@@ -290,7 +290,6 @@ void receiveMidi( void ){
 /*----------------------------------------------------------------------------*/
 void handlerNoteOn( byte channel , byte number , byte value ){
   if (channel == 0){
-    //setMidiNoteOn(number, value);
     tchkbd.makeNoteEvent(number, true, value);
   }
   change_double_board();
@@ -298,7 +297,6 @@ void handlerNoteOn( byte channel , byte number , byte value ){
 /*----------------------------------------------------------------------------*/
 void handlerNoteOff( byte channel , byte number , byte value ){
   if (channel == 0){
-    //setMidiNoteOff(number, value);
     tchkbd.makeNoteEvent(number, false, value);
   }
   change_double_board();
@@ -315,22 +313,10 @@ void handlerCC( byte channel , byte number , byte value )
 void handlerPAT( byte channel , byte note , byte pressure )
 {
   if (channel == 0){  //  for main board
-    uint16_t noteBitPtn = note & 0x0070;
-    uint16_t prsBitPtn = pressure & 0x007f;
-    uint8_t key = note & 0x0f;
-
-    uint16_t newTouch = (noteBitPtn<<3) | prsBitPtn;
-    tchkbd.setTouchEach(key+12, newTouch);  //  1octave above
+    tchkbd.check_touch_ev(note+12, pressure&0x0f, pressure&0x40?true:false);  //  1octave above
   }
   change_double_board();
 }
-/*----------------------------------------------------------------------------*/
-//void midiClock( uint8_t msg )
-//{
-//  if ( isMasterBoard == false ){
-//    MIDI.sendControlChange( midi::GeneralPurposeController1, msg, 1 );
-//  }
-//}
 /*----------------------------------------------------------------------------*/
 //
 //     Hardware Access Functions

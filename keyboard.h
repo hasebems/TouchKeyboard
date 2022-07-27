@@ -38,9 +38,9 @@ public:
   void check_ui_sw(void);
   void periodic(void);
   void mainLoop(void);
-  void checkTouchEach(uint8_t key, uint16_t sw);
-  void checkTouch(uint16_t sw[]);
-  void setTouchEach(uint8_t key, uint16_t sw);
+  void check_touch_ev(uint8_t key, int sw, bool onoff);
+  void check_touch_each(uint8_t key, uint16_t sw);
+  void check_touch(uint16_t sw[]);
   void makeNoteEvent(int tchNum, bool onoff, int vel=127);
 
   void changeControllerMode(CONTROLLER_MODE mode);
@@ -50,8 +50,6 @@ private:
   void depth_pattern(int sw);
   void pitch_pattern(int sw);
   void switch_pattern(int key);
-  void send_to_master(int key);
-  void select_pattern(int sw);
   
   static const uint8_t KEY_SWITCH[MAX_NOTE];
   bool      _crntTouch[MAX_NOTE];

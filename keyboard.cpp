@@ -239,63 +239,36 @@ void TouchKbd::switch_pattern(int key)
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::send_to_master(int key)  //  only sub board
+void TouchKbd::check_touch_ev(uint8_t key, int touch, bool onoff)
 {
-  uint8_t valueBitPtn = 0, noteBitPtn = 0;
-  for(int i=0; i<7; i++){
-    if (_touchSwitch[key][i]){valueBitPtn |= (0x01<<i);}
-  }
-
-  for(int j=0; j<3; j++){
-    if (_touchSwitch[key][j+7]){noteBitPtn |= (0x10<<j);}
-  }
-  setMidiPAT(key+noteBitPtn, valueBitPtn);
-}
-/*----------------------------------------------------------------------------*/
-void TouchKbd::select_pattern(int key)
-{
+  _touchSwitch[key][touch] = onoff;
   switch(_cntrlrMode){
-    default: // through
-    case MD_PLAIN:      send_to_master(key); break;
     case MD_DEPTH_POLY: depth_pattern(key); break;
     case MD_TOUCH_MONO: pitch_pattern(key); break;
     case MD_SWITCH:     switch_pattern(key); break;
+    case MD_PLAIN:      setMidiPAT(key, onoff? 0x40|touch:touch); break;
+    default: break;
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::checkTouchEach(uint8_t key, uint16_t raw_data)
+void TouchKbd::check_touch_each(uint8_t key, uint16_t raw_data)
 {
   for (int j=0; j<MAX_ELECTRODE; j++){
     if ((raw_data & 0x0001) && !_touchSwitch[key][j]){
-      _touchSwitch[key][j] = true;
-      select_pattern(key);
+      check_touch_ev(key,j,true);
     }
     else if (!(raw_data & 0x0001) && _touchSwitch[key][j]){
-      _touchSwitch[key][j] = false;
-      select_pattern(key);
+      check_touch_ev(key,j,false);
     }
     raw_data = raw_data>>1;
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::checkTouch(uint16_t sw[])
+void TouchKbd::check_touch(uint16_t sw[])
 {
-  for (int i=0; i<_touchSwNum; ++i){
+  for (uint8_t i=0; i<_touchSwNum; ++i){
     uint16_t raw_data = sw[i];
-    checkTouchEach(i,raw_data);
-  }
-}
-/*----------------------------------------------------------------------------*/
-void TouchKbd::setTouchEach(uint8_t key, uint16_t raw_data)
-{
-  for (int j=0; j<MAX_ELECTRODE; j++){
-    if ((raw_data & 0x0001) && !_touchSwitch[key][j]){
-      _touchSwitch[key][j] = true;
-    }
-    else if (!(raw_data & 0x0001) && _touchSwitch[key][j]){
-      _touchSwitch[key][j] = false;
-    }
-    raw_data = raw_data>>1;
+    check_touch_each(i,raw_data);
   }
 }
 /*----------------------------------------------------------------------------*/
