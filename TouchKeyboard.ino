@@ -38,6 +38,8 @@ bool availableEachDevice[MAX_DEVICE_MBR3110];
 
 GlobalTimer gt;
 static TouchKbd tchkbd;
+bool sub_board;  //  true: sub board, false: main board
+bool one_board;  //  true: sub board or main board only, false: main board that has sub board
 
 /*----------------------------------------------------------------------------*/
 void flash()
@@ -64,10 +66,11 @@ void setup()
   ada88_write(0);
 #endif
 
-  bool sub_board = false;
+  sub_board = true;
+  one_board = true;
 #ifdef USE_PCAL9555A
   err = pcal9555a_init();
-  if (err!=0){sub_board=true;}
+  if (err==0){sub_board=false;}
 #endif
 
   //  Read Jumper Pin Setting
@@ -139,14 +142,9 @@ void setup()
   }
 
   //  Init Touch Keyboard
+  tchkbd.init(maxCapSenseDevice, one_board, sub_board);
   if (!sub_board){
-    //  Main Board
-    tchkbd.init(maxCapSenseDevice*2);
     tchkbd.changeControllerMode(MD_DEPTH_POLY);
-  }
-  else {
-    //  Sub Board
-    tchkbd.init(maxCapSenseDevice);
   }
 
   //  Set NeoPixel Library 
@@ -277,6 +275,14 @@ void setMidiPitchBend(int bend)
 /*----------------------------------------------------------------------------*/
 //      Serial MIDI In
 /*----------------------------------------------------------------------------*/
+void change_double_board(void)
+{
+  if (one_board){
+    one_board = false;
+    tchkbd.init(maxCapSenseDevice*2, false, false);
+  }
+}
+/*----------------------------------------------------------------------------*/
 void receiveMidi( void ){
   MIDI.read();
   // midiEventPacket_t rx = MIDIUSB.read();
@@ -284,14 +290,18 @@ void receiveMidi( void ){
 /*----------------------------------------------------------------------------*/
 void handlerNoteOn( byte channel , byte number , byte value ){
   if (channel == 0){
-    setMidiNoteOn(number, value);
+    //setMidiNoteOn(number, value);
+    tchkbd.makeNoteEvent(number, true, value);
   }
+  change_double_board();
 }
 /*----------------------------------------------------------------------------*/
 void handlerNoteOff( byte channel , byte number , byte value ){
   if (channel == 0){
-    setMidiNoteOff(number, value);
+    //setMidiNoteOff(number, value);
+    tchkbd.makeNoteEvent(number, false, value);
   }
+  change_double_board();
 }
 /*----------------------------------------------------------------------------*/
 void handlerCC( byte channel , byte number , byte value )
@@ -299,6 +309,7 @@ void handlerCC( byte channel , byte number , byte value )
   if (channel == 0){
     setMidiControlChange(number, value);
   }
+  change_double_board();
 }
 /*----------------------------------------------------------------------------*/
 void handlerPAT( byte channel , byte note , byte pressure )
@@ -309,8 +320,9 @@ void handlerPAT( byte channel , byte note , byte pressure )
     uint8_t key = note & 0x0f;
 
     uint16_t newTouch = (noteBitPtn<<3) | prsBitPtn;
-    tchkbd.checkTouchEach(key+12, newTouch);  //  1octave above
+    tchkbd.setTouchEach(key+12, newTouch);  //  1octave above
   }
+  change_double_board();
 }
 /*----------------------------------------------------------------------------*/
 //void midiClock( uint8_t msg )

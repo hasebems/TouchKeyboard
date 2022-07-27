@@ -30,12 +30,17 @@ TouchKbd::TouchKbd(void) :
   _crntDpt{0},
   _crntVib{0},
   _crntSw{0},
-  _uiSw{false}
+  _uiSw{false},
+  _one_board(true),
+  _sub_board(true)
 {}
 /*----------------------------------------------------------------------------*/
-void TouchKbd::init(int tchSwNum)
+void TouchKbd::init(int tchSwNum, bool oneb, bool subb)
 {
   _touchSwNum = tchSwNum;
+  _one_board = oneb;
+  _sub_board = subb;
+  setMidiControlChange(120,0);  // All Sound Off
 }
 /*----------------------------------------------------------------------------*/
 void TouchKbd::incCntrlrMode(void)
@@ -131,6 +136,7 @@ void TouchKbd::changeControllerMode(CONTROLLER_MODE mode)
   else if (mode<MD_PLAIN){mode=MD_PLAIN;}
   _cntrlrMode = mode;
   if (mode!=MD_PLAIN){
+    setMidiControlChange(120,0);  //  All Sound Off
     setMidiProgramChange(mode-1);
   }
   int i;
@@ -176,7 +182,7 @@ void TouchKbd::depth_pattern(int key)
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::vibrato_pattern(int key)
+void TouchKbd::pitch_pattern(int key)
 {  //=== Vibrato Pattern ===
   uint8_t bitPtn = 0x00;
   if (_touchSwitch[key][0] || _touchSwitch[key][1] || _touchSwitch[key][3] || _touchSwitch[key][9]){
@@ -252,7 +258,7 @@ void TouchKbd::select_pattern(int key)
     default: // through
     case MD_PLAIN:      send_to_master(key); break;
     case MD_DEPTH_POLY: depth_pattern(key); break;
-    case MD_TOUCH_MONO: vibrato_pattern(key); break;
+    case MD_TOUCH_MONO: pitch_pattern(key); break;
     case MD_SWITCH:     switch_pattern(key); break;
   }
 }
@@ -280,19 +286,45 @@ void TouchKbd::checkTouch(uint16_t sw[])
   }
 }
 /*----------------------------------------------------------------------------*/
+void TouchKbd::setTouchEach(uint8_t key, uint16_t raw_data)
+{
+  for (int j=0; j<MAX_ELECTRODE; j++){
+    if ((raw_data & 0x0001) && !_touchSwitch[key][j]){
+      _touchSwitch[key][j] = true;
+    }
+    else if (!(raw_data & 0x0001) && _touchSwitch[key][j]){
+      _touchSwitch[key][j] = false;
+    }
+    raw_data = raw_data>>1;
+  }
+}
+/*----------------------------------------------------------------------------*/
 void TouchKbd::makeNoteEvent(int notenum, bool onoff, int vel)
 {
   uint8_t ofs_note = MAIN_BOARD_OFFSET_NOTE;
-  if (getControllerMode()==MD_PLAIN){
-    ofs_note = SUB_BOARD_OFFSET_NOTE;
-  }
 
-  if (onoff){
-    // Note On
-    setMidiNoteOn(ofs_note + notenum, vel);
-  }
-  else {
-    //  Note Off
-    setMidiNoteOff(ofs_note + notenum, 0);
+  switch(getControllerMode()){
+    case MD_TOUCH_MONO:
+      if (onoff){
+        // Vibrato On
+        setMidiControlChange(1,127);
+      }
+      else {
+        //  Vibrato Off
+        setMidiControlChange(1,0);
+      }
+      break;
+    case MD_PLAIN:
+      ofs_note = SUB_BOARD_OFFSET_NOTE; //  fall through
+    default:
+      if (onoff){
+        // Note On
+        setMidiNoteOn(ofs_note + notenum, vel);
+      }
+      else {
+        //  Note Off
+        setMidiNoteOff(ofs_note + notenum, 0);
+      }
+      break;
   }
 }

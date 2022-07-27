@@ -33,13 +33,14 @@ class TouchKbd {
 
 public:
   TouchKbd(void);
-  void init(int tchSwNum);
+  void init(int tchSwNum, bool oneb, bool subb);
   void incCntrlrMode(void);
   void check_ui_sw(void);
   void periodic(void);
   void mainLoop(void);
   void checkTouchEach(uint8_t key, uint16_t sw);
   void checkTouch(uint16_t sw[]);
+  void setTouchEach(uint8_t key, uint16_t sw);
   void makeNoteEvent(int tchNum, bool onoff, int vel=127);
 
   void changeControllerMode(CONTROLLER_MODE mode);
@@ -47,7 +48,7 @@ public:
 
 private:
   void depth_pattern(int sw);
-  void vibrato_pattern(int sw);
+  void pitch_pattern(int sw);
   void switch_pattern(int key);
   void send_to_master(int key);
   void select_pattern(int sw);
@@ -67,6 +68,7 @@ private:
   uint8_t   _crntSw[MAX_NOTE];
 
   bool      _uiSw[3];
-
+  bool      _one_board;
+  bool      _sub_board;
 };
 #endif
