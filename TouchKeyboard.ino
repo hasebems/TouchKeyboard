@@ -10,9 +10,11 @@
  * ========================================
  */
 #include  <MsTimer2.h>
-#include  <Adafruit_NeoPixel.h>
 #include  <MIDI.h>
 #include  <MIDIUSB.h>
+#if USE_NEO_PIXEL
+  #include  <Adafruit_NeoPixel.h>
+#endif
 
 #include  "configuration.h"
 #include  "TouchMIDI_AVR_if.h"
@@ -29,7 +31,9 @@
 //     Global Variables
 //
 /*----------------------------------------------------------------------------*/
-Adafruit_NeoPixel led = Adafruit_NeoPixel(MAX_LED, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+#if USE_NEO_PIXEL
+ Adafruit_NeoPixel led = Adafruit_NeoPixel(MAX_LED, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+#endif
 MIDI_CREATE_DEFAULT_INSTANCE();
 
 /*----------------------------------------------------------------------------*/
@@ -53,7 +57,7 @@ void setup()
   int i;
 
   //  Initialize Hardware
-  wireBegin();
+  //  MIDI
   MIDI.setHandleNoteOff(handlerNoteOff);
   MIDI.setHandleNoteOn(handlerNoteOn);
   MIDI.setHandleControlChange(handlerCC);
@@ -61,6 +65,8 @@ void setup()
   MIDI.begin();
   MIDI.turnThruOff();
 
+  //  I2C
+  wireBegin();
 #ifdef USE_ADA88
   ada88_init();
   ada88_write(0);
@@ -148,8 +154,10 @@ void setup()
   }
 
   //  Set NeoPixel Library 
+#if USE_NEO_PIXEL
   led.begin();
   led.show(); // Initialize all pixels to 'off'
+#endif
 
   //  Set Interrupt
   MsTimer2::set(10, flash);     // 10ms Interval Timer Interrupt
@@ -264,10 +272,10 @@ void setMidiPAT( uint8_t note, uint8_t value )
   MidiUSB.flush();
 }
 /*----------------------------------------------------------------------------*/
-void setMidiPitchBend(int bend)
+void setMidiPitchBend(int bend) //  -8192 - 0 - 8191
 {
   MIDI.sendPitchBend(bend, 0);
-  bend += 0x4000;
+  bend += 0x2000;
   midiEventPacket_t event = {0x0e, 0xe0, static_cast<uint8_t>(bend & 0x007f), static_cast<uint8_t>((bend & 0x3f80)>>7)};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
@@ -275,11 +283,13 @@ void setMidiPitchBend(int bend)
 /*----------------------------------------------------------------------------*/
 //      Serial MIDI In
 /*----------------------------------------------------------------------------*/
-void change_double_board(void)
+void change_double_board(int fromWhich)
 {
-  if (one_board){
+  if (one_board && !sub_board){
     one_board = false;
     tchkbd.init(maxCapSenseDevice*2, false, false);
+    //  $$$$$ Deb $$$$$
+    setAda88_Number(fromWhich);
   }
 }
 /*----------------------------------------------------------------------------*/
@@ -288,34 +298,40 @@ void receiveMidi( void ){
   // midiEventPacket_t rx = MIDIUSB.read();
 }
 /*----------------------------------------------------------------------------*/
-void handlerNoteOn( byte channel , byte number , byte value ){
+void handlerNoteOn( byte channel , byte number , byte value )
+{
+  if (sub_board){return;}
   if (channel == 0){
+    change_double_board(0);
     tchkbd.makeNoteEvent(number, true, value);
   }
-  change_double_board();
 }
 /*----------------------------------------------------------------------------*/
-void handlerNoteOff( byte channel , byte number , byte value ){
+void handlerNoteOff( byte channel , byte number , byte value )
+{
+  if (sub_board){return;}
   if (channel == 0){
+    change_double_board(1);
     tchkbd.makeNoteEvent(number, false, value);
   }
-  change_double_board();
 }
 /*----------------------------------------------------------------------------*/
 void handlerCC( byte channel , byte number , byte value )
 {
+  if (sub_board){return;}
   if (channel == 0){
+    change_double_board(2);
     setMidiControlChange(number, value);
   }
-  change_double_board();
 }
 /*----------------------------------------------------------------------------*/
 void handlerPAT( byte channel , byte note , byte pressure )
 {
-  if (channel == 0){  //  for main board
+  if (sub_board){return;}
+  if (channel == 0){
+    change_double_board(3);
     tchkbd.check_touch_ev(note+12, pressure&0x0f, pressure&0x40?true:false);  //  1octave above
   }
-  change_double_board();
 }
 /*----------------------------------------------------------------------------*/
 //
@@ -346,6 +362,7 @@ void setAda88_5prm(uint8_t prm1,uint8_t prm2,uint8_t prm3,uint8_t prm4,uint8_t p
 //     Blink LED by NeoPixel Library
 //
 /*----------------------------------------------------------------------------*/
+#if USE_NEO_PIXEL
 const uint8_t colorTable[16][3] = {
   { 200,   0,   0 },//  C
   { 175,  30,   0 },
@@ -375,3 +392,4 @@ void lightLed( void )
 {
   led.show();
 }
+#endif

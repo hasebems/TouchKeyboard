@@ -28,12 +28,13 @@ TouchKbd::TouchKbd(void) :
   _joystick_y(0),
   _cntrlrMode(MD_PLAIN),
   _crntDpt{0},
-  _crntVib{0},
   _crntSw{0},
   _uiSw{false},
   _one_board(true),
-  _sub_board(true)
-{}
+  _sub_board(true),
+  _note_on_state(false),
+  _target_pitch(0),
+  _current_pitch(0){}
 /*----------------------------------------------------------------------------*/
 void TouchKbd::init(int tchSwNum, bool oneb, bool subb)
 {
@@ -41,6 +42,9 @@ void TouchKbd::init(int tchSwNum, bool oneb, bool subb)
   _one_board = oneb;
   _sub_board = subb;
   setMidiControlChange(120,0);  // All Sound Off
+
+  if (_one_board){ setAda88_5prm(_cntrlrMode, 1, 1, 1, 1);}
+  else { setAda88_5prm(_cntrlrMode, 2, 2, 2, 2);}
 }
 /*----------------------------------------------------------------------------*/
 void TouchKbd::incCntrlrMode(void)
@@ -57,17 +61,15 @@ void TouchKbd::check_ui_sw(void)
 {
 #ifdef USE_PCAL9555A
   uint8_t val = 0;
-  int err = pcal9555a_get_value(1,&val);
+  const int err = pcal9555a_get_value(1,&val);
   if (err!=0){return;}
+  const CONTROLLER_MODE cmd[3] = {MD_DEPTH_POLY,MD_TOUCH_MONO,MD_SWITCH};
 
   for (int j=0; j<3; j++){
     if ((~val)&(0x80>>j)){
       if (!_uiSw[j]){
         _uiSw[j]=true;
-        // on event
-        if (j==0){ changeControllerMode(MD_DEPTH_POLY);}
-        if (j==1){ changeControllerMode(MD_TOUCH_MONO);}
-        if (j==2){ changeControllerMode(MD_SWITCH);}
+        changeControllerMode(cmd[j]); // sw on event
       }
     }
     else {
@@ -84,25 +86,37 @@ void TouchKbd::periodic(void) // once 10msec
       _anti_chattering_counter[i]++;
     }
   }
-  int x = analogRead( JOYSTICK_X );
+
+  //  Joystick
+  int x = analogRead( JOYSTICK_X ); //  0-1023
   int y = analogRead( JOYSTICK_Y );
   if ((x-_joystick_x>HYSTERISIS_LIMIT) || (x-_joystick_x<-HYSTERISIS_LIMIT)){
     _joystick_x = x;
-    setMidiControlChange(18, static_cast<uint8_t>(x/8));
+    setMidiControlChange(18, static_cast<uint8_t>(x/8));  //  0-127
+    switch(_cntrlrMode){
+      case MD_DEPTH_POLY: setMidiPitchBend(((x-512)*27)/10); break;
+      case MD_SWITCH:     setMidiControlChange(18, static_cast<uint8_t>(x/8)); break;
+      default: break;
+    }
   }
   if ((y-_joystick_y>HYSTERISIS_LIMIT) || (y-_joystick_y<-HYSTERISIS_LIMIT)){
     _joystick_y = y;
-    if (_cntrlrMode == MD_SWITCH){
-      setMidiControlChange(19, static_cast<uint8_t>(y/8));
-    }
-    else {
-      setMidiPitchBend(static_cast<uint8_t>(y/8));
+    switch(_cntrlrMode){
+      case MD_TOUCH_MONO: setMidiControlChange(1, static_cast<uint8_t>(y/8)); break;
+      case MD_SWITCH:     setMidiControlChange(19, static_cast<uint8_t>(y/8)); break;
+      default: break;
     }
   }
+
+  //  3 mode change switch
   check_ui_sw();
 
   //  display Ada88
-  setAda88_5prm(_cntrlrMode, 2, 3, 4, 5);
+  int max=0;
+  for (int i=0; i<_touchSwNum; ++i){
+    if (max<_crntDpt[i]){max=_crntDpt[i];}
+  }
+  setAda88_5prm(_cntrlrMode, x/128, y/128, max/16, max/16);
 }
 /*----------------------------------------------------------------------------*/
 void TouchKbd::mainLoop(void)
@@ -137,15 +151,20 @@ void TouchKbd::changeControllerMode(CONTROLLER_MODE mode)
   _cntrlrMode = mode;
   if (mode!=MD_PLAIN){
     setMidiControlChange(120,0);  //  All Sound Off
-    setMidiProgramChange(mode-1);
+    setMidiProgramChange(mode+15);
   }
   int i;
   switch(mode){
     case MD_DEPTH_POLY: for (i=0;i<MAX_NOTE; i++){ _crntDpt[i]=0;} break;
-    case MD_TOUCH_MONO: for (i=0;i<MAX_NOTE; i++){ _crntVib[i]=0;} break;
+    case MD_TOUCH_MONO:
+      _note_on_state = false;
+      _target_pitch = _current_pitch = 0;
+      break;
     case MD_SWITCH:     for (i=0;i<MAX_NOTE; i++){ _crntSw[i]=0;} break;
     default: break;
-  }  
+  }
+  if (_one_board){ setAda88_5prm(_cntrlrMode, 1, 1, 1, 1);}
+  else { setAda88_5prm(_cntrlrMode, 2, 2, 2, 2);}
 }
 /*----------------------------------------------------------------------------*/
 //      |01|09|00|03|  |
@@ -182,21 +201,59 @@ void TouchKbd::depth_pattern(int key)
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::pitch_pattern(int key)
-{  //=== Vibrato Pattern ===
-  uint8_t bitPtn = 0x00;
-  if (_touchSwitch[key][0] || _touchSwitch[key][1] || _touchSwitch[key][3] || _touchSwitch[key][9]){
-    bitPtn = 0x02;
+void TouchKbd::pitch_pattern(void)
+{  //=== Pitch Pattern ===
+  uint8_t bitPtn = 0;
+  int highest_key = -1;
+  bool  onoff = false;
+  for (int key=_touchSwNum-1; key>=0; --key){
+    if (_touchSwitch[key][0] || _touchSwitch[key][1] || _touchSwitch[key][3] || _touchSwitch[key][9]){
+      bitPtn |= 0x02;
+    }
+    if (_touchSwitch[key][5] || _touchSwitch[key][6] || _touchSwitch[key][7] || _touchSwitch[key][8]){
+      bitPtn |= 0x01;
+    }
+    if (_touchSwitch[key][2] || _touchSwitch[key][4]){
+      bitPtn |= 0x10;
+    }
+    if (bitPtn != 0){onoff = true; highest_key = key; break;}
   }
-  if (_touchSwitch[key][5] || _touchSwitch[key][6] || _touchSwitch[key][7] || _touchSwitch[key][8]){
-    bitPtn = 0x01;
+
+  if (onoff){
+    const int SEMI_NOTE_PB = 682;
+    int pit = 0;
+    if (bitPtn>=0x03){pit=SEMI_NOTE_PB*highest_key;}
+    else if (bitPtn == 0x02){pit=SEMI_NOTE_PB*highest_key+SEMI_NOTE_PB/2;}
+    else if (bitPtn == 0x01){pit=SEMI_NOTE_PB*highest_key-SEMI_NOTE_PB/2;}
+    _target_pitch = pit-SEMI_NOTE_PB*12;
   }
-  uint8_t vib = 0;
-  if (bitPtn==0x01){vib=1;}
-  else if (bitPtn==0x02){vib=2;}
-  if (vib!=_crntVib[key]){
-    setMidiPAT(MAIN_BOARD_OFFSET_NOTE+key,vib);
-    _crntVib[key] = vib;
+
+  if (!_note_on_state){
+    if (onoff){
+      //  Note On
+      setMidiPitchBend(_current_pitch);
+      setMidiNoteOn(0x48, 127);
+      _note_on_state = true;
+    }
+  }
+  else {
+    if (!onoff){
+      //  Note Off
+      setMidiNoteOff(0x48, 0);
+      _note_on_state = false;
+    }
+    else {
+      int last_pitch = _current_pitch;
+      int diff = _target_pitch - _current_pitch;
+      if (diff > 100){ _current_pitch += 100;}
+      else if (diff < -100){ _current_pitch -= 100;}
+      else { _current_pitch = _target_pitch;}
+      if (last_pitch != _current_pitch){
+        if (_current_pitch<-8192){ _current_pitch = -8192;}
+        else if (_current_pitch>8191){ _current_pitch = 8191;}
+        setMidiPitchBend(_current_pitch);
+      }
+    }
   }
 }
 /*----------------------------------------------------------------------------*/
@@ -241,11 +298,10 @@ void TouchKbd::switch_pattern(int key)
 /*----------------------------------------------------------------------------*/
 void TouchKbd::check_touch_ev(uint8_t key, int touch, bool onoff)
 {
-  _touchSwitch[key][touch] = onoff;
   switch(_cntrlrMode){
     case MD_DEPTH_POLY: depth_pattern(key); break;
-    case MD_TOUCH_MONO: pitch_pattern(key); break;
-    case MD_SWITCH:     switch_pattern(key); break;
+    case MD_TOUCH_MONO: break;
+    case MD_SWITCH:     depth_pattern(key); break;
     case MD_PLAIN:      setMidiPAT(key, onoff? 0x40|touch:touch); break;
     default: break;
   }
@@ -255,20 +311,25 @@ void TouchKbd::check_touch_each(uint8_t key, uint16_t raw_data)
 {
   for (int j=0; j<MAX_ELECTRODE; j++){
     if ((raw_data & 0x0001) && !_touchSwitch[key][j]){
+      _touchSwitch[key][j] = true;
       check_touch_ev(key,j,true);
     }
     else if (!(raw_data & 0x0001) && _touchSwitch[key][j]){
+      _touchSwitch[key][j] = false;
       check_touch_ev(key,j,false);
     }
     raw_data = raw_data>>1;
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::check_touch(uint16_t sw[])
+void TouchKbd::check_touch(uint16_t sw[]) //  once a 10msec
 {
-  for (uint8_t i=0; i<_touchSwNum; ++i){
-    uint16_t raw_data = sw[i];
-    check_touch_each(i,raw_data);
+  for (uint8_t i=0; i<MAX_NOTE; ++i){
+    check_touch_each(i,sw[i]);
+  }
+
+  if (_cntrlrMode == MD_TOUCH_MONO){
+    pitch_pattern();
   }
 }
 /*----------------------------------------------------------------------------*/
@@ -280,7 +341,7 @@ void TouchKbd::makeNoteEvent(int notenum, bool onoff, int vel)
     case MD_TOUCH_MONO:
       if (onoff){
         // Vibrato On
-        setMidiControlChange(1,127);
+        setMidiControlChange(1,32);
       }
       else {
         //  Vibrato Off

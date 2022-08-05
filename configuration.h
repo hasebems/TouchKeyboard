@@ -14,7 +14,7 @@
 //---------------------------------------------------------
 //    Touch Sensor Setup Mode
 //---------------------------------------------------------
-#define   SETUP_MODE    1   //  1: Setup Mode, 0: Normal Mode
+#define   SETUP_MODE    0   //  1: Setup Mode, 0: Normal Mode
 
 #define   MAX_DEVICE_MBR3110    12
 
@@ -45,6 +45,7 @@
 //  Not Use
 #define   MAX_LED       12
 
+//#define  USE_NEO_PIXEL
 //---------------------------------------------------------
 //    I2C Device Configuration
 //---------------------------------------------------------
@@ -58,5 +59,5 @@
 //#define   USE_PCA9685
 //#define   USE_ATTINY
 //#define   USE_PCA9544A
-
+#define   USE_PCAL9555A
 #endif

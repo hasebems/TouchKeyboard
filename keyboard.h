@@ -48,7 +48,7 @@ public:
 
 private:
   void depth_pattern(int sw);
-  void pitch_pattern(int sw);
+  void pitch_pattern(void);
   void switch_pattern(int key);
   
   static const uint8_t KEY_SWITCH[MAX_NOTE];
@@ -62,11 +62,15 @@ private:
   CONTROLLER_MODE _cntrlrMode;
 
   uint8_t   _crntDpt[MAX_NOTE];
-  uint8_t   _crntVib[MAX_NOTE];
   uint8_t   _crntSw[MAX_NOTE];
 
   bool      _uiSw[3];
   bool      _one_board;
   bool      _sub_board;
+
+  //  MD_TOUCH_MONO
+  bool      _note_on_state;
+  int       _target_pitch;    //  -0.5..0..11..23..23.5
+  int       _current_pitch;   //  same as above
 };
 #endif
