@@ -1,6 +1,6 @@
 /* ========================================
  *
- *  TouchMIDI_AVR_common_32U4
+ *  TouchMIDI_AVR_common_32U4 for Touch Keyboard
  *    description: Main Loop
  *    for Arduino Leonardo
  *
@@ -12,7 +12,7 @@
 #include  <MsTimer2.h>
 #include  <MIDI.h>
 #include  <MIDIUSB.h>
-#if USE_NEO_PIXEL
+#ifdef USE_NEO_PIXEL
   #include  <Adafruit_NeoPixel.h>
 #endif
 
@@ -192,7 +192,7 @@ void loop()
           errNum += 0x01<<i;
         }
         sw[i] = (((uint16_t)swtmp[1])<<8) + swtmp[0];
-        //setAda88_Number(sw[i]*10);
+        //setAda88_Number(sw[i]*10); //$$$
       }
     }
     if (errNum){
@@ -201,11 +201,10 @@ void loop()
     }
     else {
       digitalWrite(LED_ERR, LOW);
-      tchkbd.check_touch(sw);
+      tchkbd.judgeIfTouchEv(sw);
     }
  #endif
-    //  Processing
-    //  do something
+    //  Touch Keyboard Processing
     tchkbd.periodic();
   }
 }
@@ -293,30 +292,30 @@ void change_double_board(int fromWhich)
   }
 }
 /*----------------------------------------------------------------------------*/
-void receiveMidi( void ){
+void receiveMidi(void){
   MIDI.read();
   // midiEventPacket_t rx = MIDIUSB.read();
 }
 /*----------------------------------------------------------------------------*/
-void handlerNoteOn( byte channel , byte number , byte value )
+void handlerNoteOn(byte channel , byte note , byte vel)
 {
   if (sub_board){return;}
   if (channel == 0){
     change_double_board(0);
-    tchkbd.makeNoteEvent(number, true, value);
+    tchkbd.makeKeySwEvent(note, true, vel);
   }
 }
 /*----------------------------------------------------------------------------*/
-void handlerNoteOff( byte channel , byte number , byte value )
+void handlerNoteOff(byte channel , byte note , byte vel)
 {
   if (sub_board){return;}
   if (channel == 0){
     change_double_board(1);
-    tchkbd.makeNoteEvent(number, false, value);
+    tchkbd.makeKeySwEvent(note, false, vel);
   }
 }
 /*----------------------------------------------------------------------------*/
-void handlerCC( byte channel , byte number , byte value )
+void handlerCC(byte channel , byte number , byte value)
 {
   if (sub_board){return;}
   if (channel == 0){
@@ -325,12 +324,12 @@ void handlerCC( byte channel , byte number , byte value )
   }
 }
 /*----------------------------------------------------------------------------*/
-void handlerPAT( byte channel , byte note , byte pressure )
+void handlerPAT(byte channel , byte note , byte pressure)
 {
   if (sub_board){return;}
   if (channel == 0){
     change_double_board(3);
-    tchkbd.check_touch_ev(note+12, pressure&0x0f, pressure&0x40?true:false);  //  1octave above
+    tchkbd.execTouchEv(note, pressure&0x0f, pressure&0x40?true:false);  //  1octave above
   }
 }
 /*----------------------------------------------------------------------------*/
