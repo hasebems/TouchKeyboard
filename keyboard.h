@@ -21,6 +21,7 @@ constexpr uint8_t MAX_CHATTERING_TIME = 3;  // *10msec
 constexpr uint8_t MAX_ELECTRODE = 10;
 constexpr uint8_t MAIN_BOARD_OFFSET_NOTE = 60;
 constexpr uint8_t SUB_BOARD_OFFSET_NOTE = 72;
+constexpr int HYSTERISIS_LIMIT = 10;
 
 enum CONTROLLER_MODE {
   MD_PLAIN = 0,       //  Sub Board
@@ -34,23 +35,25 @@ class TouchKbd {
 public:
   TouchKbd(void);
   void init(int tchSwNum, bool oneb, bool subb);
-  void incCntrlrMode(void);
-  void check_ui_sw(void);
   void periodic(void);
   void mainLoop(void);
-  void check_touch_ev(uint8_t key, int sw, bool onoff);
-  void check_touch_each(uint8_t key, uint16_t sw);
-  void check_touch(uint16_t sw[]);
-  void makeNoteEvent(int tchNum, bool onoff, int vel=127);
 
+  void execTouchEv(uint8_t key, int sw, bool onoff);
+  void judgeIfTouchEv(uint16_t sw[]);
+  void makeKeySwEvent(int tchNum, bool onoff, int vel=127);
+
+  void incCntrlrMode(void);
   void changeControllerMode(CONTROLLER_MODE mode);
   CONTROLLER_MODE getControllerMode(void) const {return _cntrlrMode;}
 
 private:
+  void check_ui_sw(void);
+  void joy_stick(void);
   void depth_pattern(int sw);
   void pitch_pattern(void);
   void switch_pattern(int key);
-  
+  void check_touch_each(uint8_t key, uint16_t sw);
+
   static const uint8_t KEY_SWITCH[MAX_NOTE];
   bool      _crntTouch[MAX_NOTE];
   uint8_t   _anti_chattering_counter[MAX_NOTE];

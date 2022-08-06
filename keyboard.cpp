@@ -17,7 +17,6 @@
 const uint8_t TouchKbd::KEY_SWITCH[MAX_NOTE] = {
   KBD_C, KBD_CS, KBD_D, KBD_DS, KBD_E, KBD_F, KBD_FS, KBD_G, KBD_GS, KBD_A, KBD_AS, KBD_B
 };
-const int HYSTERISIS_LIMIT = 10;
 /*----------------------------------------------------------------------------*/
 TouchKbd::TouchKbd(void) :
   _crntTouch{0},
@@ -47,16 +46,6 @@ void TouchKbd::init(int tchSwNum, bool oneb, bool subb)
   else { setAda88_5prm(_cntrlrMode, 2, 2, 2, 2);}
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::incCntrlrMode(void)
-{
-  switch(_cntrlrMode){
-    case MD_PLAIN:      break;
-    case MD_DEPTH_POLY: _cntrlrMode = MD_TOUCH_MONO; break;
-    case MD_TOUCH_MONO: _cntrlrMode = MD_SWITCH; break;
-    case MD_SWITCH:     _cntrlrMode = MD_DEPTH_POLY; break;
-  }
-}
-/*----------------------------------------------------------------------------*/
 void TouchKbd::check_ui_sw(void)
 {
 #ifdef USE_PCAL9555A
@@ -79,14 +68,8 @@ void TouchKbd::check_ui_sw(void)
 #endif
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::periodic(void) // once 10msec
+void TouchKbd::joy_stick(void)
 {
-  for (int i=0; i<MAX_NOTE; ++i){
-    if (_anti_chattering_counter[i] < MAX_CHATTERING_TIME){
-      _anti_chattering_counter[i]++;
-    }
-  }
-
   //  Joystick
   int x = analogRead( JOYSTICK_X ); //  0-1023
   int y = analogRead( JOYSTICK_Y );
@@ -101,22 +84,38 @@ void TouchKbd::periodic(void) // once 10msec
   }
   if ((y-_joystick_y>HYSTERISIS_LIMIT) || (y-_joystick_y<-HYSTERISIS_LIMIT)){
     _joystick_y = y;
+    uint8_t abs_y = (y>=512)?(y-512):(512-y);
     switch(_cntrlrMode){
-      case MD_TOUCH_MONO: setMidiControlChange(1, static_cast<uint8_t>(y/8)); break;
+      case MD_TOUCH_MONO: setMidiControlChange(1, static_cast<uint8_t>(abs_y/16)); break;
       case MD_SWITCH:     setMidiControlChange(19, static_cast<uint8_t>(y/8)); break;
       default: break;
     }
   }
-
-  //  3 mode change switch
-  check_ui_sw();
-
-  //  display Ada88
-  int max=0;
-  for (int i=0; i<_touchSwNum; ++i){
-    if (max<_crntDpt[i]){max=_crntDpt[i];}
+}
+/*----------------------------------------------------------------------------*/
+void TouchKbd::periodic(void) // once 10msec
+{
+  //  anti chattring counter
+  for (int i=0; i<MAX_NOTE; ++i){
+    if (_anti_chattering_counter[i] < MAX_CHATTERING_TIME){
+      _anti_chattering_counter[i]++;
+    }
   }
-  setAda88_5prm(_cntrlrMode, x/128, y/128, max/16, max/16);
+
+  if (!_sub_board){
+    //  generate MIDI from Joy Stick
+    joy_stick();
+
+    //  3 mode change switch
+    check_ui_sw();
+
+    //  display Ada88
+    int max=0;
+    for (int i=0; i<_touchSwNum; ++i){
+      if (max<_crntDpt[i]){max=_crntDpt[i];}
+    }
+    setAda88_5prm(_cntrlrMode, _joystick_x/128, _joystick_y/128, max/16, max/16);
+  }
 }
 /*----------------------------------------------------------------------------*/
 void TouchKbd::mainLoop(void)
@@ -127,7 +126,7 @@ void TouchKbd::mainLoop(void)
       if (sw == HIGH){
         digitalWrite(LED_ERR, LOW);
         if (_crntTouch[i] == true){
-          makeNoteEvent(i,false);
+          makeKeySwEvent(i,false);
           _crntTouch[i] = false;
           _anti_chattering_counter[i] = 0;
         }
@@ -135,12 +134,22 @@ void TouchKbd::mainLoop(void)
       else {
         digitalWrite(LED_ERR, HIGH);
         if (_crntTouch[i] == false){
-          makeNoteEvent(i,true);
+          makeKeySwEvent(i,true);
           _crntTouch[i] = true;
           _anti_chattering_counter[i] = 0;
         }
       }
     }
+  }
+}
+/*----------------------------------------------------------------------------*/
+void TouchKbd::incCntrlrMode(void)
+{
+  switch(_cntrlrMode){
+    case MD_PLAIN:      break;
+    case MD_DEPTH_POLY: _cntrlrMode = MD_TOUCH_MONO; break;
+    case MD_TOUCH_MONO: _cntrlrMode = MD_SWITCH; break;
+    case MD_SWITCH:     _cntrlrMode = MD_DEPTH_POLY; break;
   }
 }
 /*----------------------------------------------------------------------------*/
@@ -152,6 +161,7 @@ void TouchKbd::changeControllerMode(CONTROLLER_MODE mode)
   if (mode!=MD_PLAIN){
     setMidiControlChange(120,0);  //  All Sound Off
     setMidiProgramChange(mode+15);
+    setMidiPitchBend(0);
   }
   int i;
   switch(mode){
@@ -296,13 +306,13 @@ void TouchKbd::switch_pattern(int key)
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::check_touch_ev(uint8_t key, int touch, bool onoff)
+void TouchKbd::execTouchEv(uint8_t key, int touch, bool onoff)
 {
   switch(_cntrlrMode){
     case MD_DEPTH_POLY: depth_pattern(key); break;
     case MD_TOUCH_MONO: break;
     case MD_SWITCH:     depth_pattern(key); break;
-    case MD_PLAIN:      setMidiPAT(key, onoff? 0x40|touch:touch); break;
+    case MD_PLAIN:      setMidiPAT(key+12, onoff? 0x40|touch:touch); break;
     default: break;
   }
 }
@@ -312,17 +322,17 @@ void TouchKbd::check_touch_each(uint8_t key, uint16_t raw_data)
   for (int j=0; j<MAX_ELECTRODE; j++){
     if ((raw_data & 0x0001) && !_touchSwitch[key][j]){
       _touchSwitch[key][j] = true;
-      check_touch_ev(key,j,true);
+      execTouchEv(key,j,true);
     }
     else if (!(raw_data & 0x0001) && _touchSwitch[key][j]){
       _touchSwitch[key][j] = false;
-      check_touch_ev(key,j,false);
+      execTouchEv(key,j,false);
     }
     raw_data = raw_data>>1;
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::check_touch(uint16_t sw[]) //  once a 10msec
+void TouchKbd::judgeIfTouchEv(uint16_t sw[]) //  once a 10msec
 {
   for (uint8_t i=0; i<MAX_NOTE; ++i){
     check_touch_each(i,sw[i]);
@@ -333,7 +343,7 @@ void TouchKbd::check_touch(uint16_t sw[]) //  once a 10msec
   }
 }
 /*----------------------------------------------------------------------------*/
-void TouchKbd::makeNoteEvent(int notenum, bool onoff, int vel)
+void TouchKbd::makeKeySwEvent(int notenum, bool onoff, int vel)
 {
   uint8_t ofs_note = MAIN_BOARD_OFFSET_NOTE;
 
