@@ -308,11 +308,12 @@ void TouchKbd::switch_pattern(int key)
 /*----------------------------------------------------------------------------*/
 void TouchKbd::execTouchEv(uint8_t key, int touch, bool onoff)
 {
+  _touchSwitch[key][touch] = onoff;
   switch(_cntrlrMode){
     case MD_DEPTH_POLY: depth_pattern(key); break;
     case MD_TOUCH_MONO: break;
     case MD_SWITCH:     depth_pattern(key); break;
-    case MD_PLAIN:      setMidiPAT(key+12, onoff? 0x40|touch:touch); break;
+    case MD_PLAIN:      setMidiPAT(key+MAX_NOTE, onoff? 0x40|touch:touch); break;
     default: break;
   }
 }
@@ -321,11 +322,9 @@ void TouchKbd::check_touch_each(uint8_t key, uint16_t raw_data)
 {
   for (int j=0; j<MAX_ELECTRODE; j++){
     if ((raw_data & 0x0001) && !_touchSwitch[key][j]){
-      _touchSwitch[key][j] = true;
       execTouchEv(key,j,true);
     }
     else if (!(raw_data & 0x0001) && _touchSwitch[key][j]){
-      _touchSwitch[key][j] = false;
       execTouchEv(key,j,false);
     }
     raw_data = raw_data>>1;
@@ -359,7 +358,7 @@ void TouchKbd::makeKeySwEvent(int notenum, bool onoff, int vel)
       }
       break;
     case MD_PLAIN:
-      ofs_note = SUB_BOARD_OFFSET_NOTE; //  fall through
+      ofs_note = MAX_NOTE; //  fall through
     default:
       if (onoff){
         // Note On
