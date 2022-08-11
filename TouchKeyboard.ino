@@ -124,6 +124,7 @@ void setup()
     delay(100);
   }
   digitalWrite(LED_ERR, LOW);
+  while(1);
 #endif
 
   //  Normal Mode
