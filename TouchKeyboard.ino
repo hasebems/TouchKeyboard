@@ -234,7 +234,7 @@ void generateTimer( void )
 /*----------------------------------------------------------------------------*/
 void setMidiNoteOn( uint8_t note, uint8_t vel )
 {
-  MIDI.sendNoteOn( note, vel, 1 );
+  MIDI.sendNoteOn(note, vel, 1);
   midiEventPacket_t event = {0x09, 0x90, note, vel};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
@@ -242,7 +242,7 @@ void setMidiNoteOn( uint8_t note, uint8_t vel )
 /*----------------------------------------------------------------------------*/
 void setMidiNoteOff( uint8_t note, uint8_t vel )
 {
-  MIDI.sendNoteOff( note, vel, 1 );
+  MIDI.sendNoteOff(note, vel, 1);
   midiEventPacket_t event = {0x09, 0x90, note, 0};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
@@ -250,7 +250,7 @@ void setMidiNoteOff( uint8_t note, uint8_t vel )
 /*----------------------------------------------------------------------------*/
 void setMidiProgramChange( uint8_t number )
 {
-  MIDI.sendProgramChange( number, 0);
+  MIDI.sendProgramChange(number, 1);
   midiEventPacket_t event = {0x0c, 0xc0, number, 0};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
@@ -258,7 +258,7 @@ void setMidiProgramChange( uint8_t number )
 /*----------------------------------------------------------------------------*/
 void setMidiControlChange( uint8_t controller, uint8_t value )
 {
-  MIDI.sendControlChange( controller, value, 0 );
+  MIDI.sendControlChange(controller, value, 1);
   midiEventPacket_t event = {0x0b, 0xb0, controller, value};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
@@ -266,7 +266,7 @@ void setMidiControlChange( uint8_t controller, uint8_t value )
 /*----------------------------------------------------------------------------*/
 void setMidiPAT( uint8_t note, uint8_t value )
 {
-  MIDI.sendPolyPressure( note, value, 0 );
+  MIDI.sendPolyPressure(note, value, 1);
   midiEventPacket_t event = {0x0a, 0xa0, note, value};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
@@ -274,7 +274,7 @@ void setMidiPAT( uint8_t note, uint8_t value )
 /*----------------------------------------------------------------------------*/
 void setMidiPitchBend(int bend) //  -8192 - 0 - 8191
 {
-  MIDI.sendPitchBend(bend, 0);
+  MIDI.sendPitchBend(bend, 1);
   bend += 0x2000;
   midiEventPacket_t event = {0x0e, 0xe0, static_cast<uint8_t>(bend & 0x007f), static_cast<uint8_t>((bend & 0x3f80)>>7)};
   MidiUSB.sendMIDI(event);
@@ -301,7 +301,7 @@ void receiveMidi(void){
 void handlerNoteOn(byte channel , byte note , byte vel)
 {
   if (sub_board){return;}
-  if (channel == 0){
+  if (channel == 1){
     change_double_board(0);
     tchkbd.makeKeySwEvent(note, true, vel);
   }
@@ -310,7 +310,7 @@ void handlerNoteOn(byte channel , byte note , byte vel)
 void handlerNoteOff(byte channel , byte note , byte vel)
 {
   if (sub_board){return;}
-  if (channel == 0){
+  if (channel == 1){
     change_double_board(1);
     tchkbd.makeKeySwEvent(note, false, vel);
   }
@@ -319,7 +319,7 @@ void handlerNoteOff(byte channel , byte note , byte vel)
 void handlerCC(byte channel , byte number , byte value)
 {
   if (sub_board){return;}
-  if (channel == 0){
+  if (channel == 1){
     change_double_board(2);
     setMidiControlChange(number, value);
   }
@@ -328,7 +328,7 @@ void handlerCC(byte channel , byte number , byte value)
 void handlerPAT(byte channel , byte note , byte pressure)
 {
   if (sub_board){return;}
-  if (channel == 0){
+  if (channel == 1){
     change_double_board(3);
     tchkbd.execTouchEv(note, pressure&0x0f, pressure&0x40?true:false);  //  1octave above
   }
