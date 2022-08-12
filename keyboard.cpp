@@ -170,7 +170,11 @@ void TouchKbd::changeControllerMode(CONTROLLER_MODE mode)
       _note_on_state = false;
       _target_pitch = _current_pitch = 0;
       break;
-    case MD_SWITCH:     for (i=0;i<MAX_NOTE; i++){ _crntSw[i]=0;} break;
+    case MD_SWITCH:
+      for (i=0;i<MAX_NOTE; i++){ _crntSw[i]=0;}
+      setMidiControlChange(18, static_cast<uint8_t>(_joystick_x/8));
+      setMidiControlChange(19, static_cast<uint8_t>(_joystick_y/8));
+      break;
     default: break;
   }
   if (_one_board){ setAda88_5prm(_cntrlrMode, 1, 1, 1, 1);}
